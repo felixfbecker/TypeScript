@@ -777,7 +777,7 @@ interface Array<T> {}`
             }
         }
 
-        readFile(s: string): string | undefined {
+        readFile(s: string): Promise<string | undefined> {
             const fsEntry = this.getRealFile(this.toFullPath(s));
             return fsEntry ? fsEntry.content : undefined;
         }

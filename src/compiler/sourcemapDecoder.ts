@@ -1,19 +1,19 @@
 /* @internal */
 namespace ts {
     export interface SourceFileLikeCache {
-        get(path: Path): SourceFileLike | undefined;
+        get(path: Path): Promise<SourceFileLike | undefined>;
     }
 
-    export function createSourceFileLikeCache(host: { readFile?: (path: string) => string | undefined, fileExists?: (path: string) => boolean }): SourceFileLikeCache {
+    export function createSourceFileLikeCache(host: { readFile?: (path: string) => Promise<string | undefined>, fileExists?: (path: string) => boolean }): SourceFileLikeCache {
         const cached = createMap<SourceFileLike>();
         return {
-            get(path: Path) {
+            async get(path: Path) {
                 if (cached.has(path)) {
                     return cached.get(path);
                 }
                 if (!host.fileExists || !host.readFile || !host.fileExists(path)) return;
                 // And failing that, check the disk
-                const text = host.readFile(path)!; // TODO: GH#18217
+                const text = await host.readFile(path)!; // TODO: GH#18217
                 const file = {
                     text,
                     lineMap: undefined,
@@ -46,14 +46,14 @@ namespace ts.sourcemaps {
     }
 
     export interface SourceMapper {
-        getOriginalPosition(input: SourceMappableLocation): SourceMappableLocation;
-        getGeneratedPosition(input: SourceMappableLocation): SourceMappableLocation;
+        getOriginalPosition(input: SourceMappableLocation): Promise<SourceMappableLocation>;
+        getGeneratedPosition(input: SourceMappableLocation): Promise<SourceMappableLocation>;
     }
 
     export const identitySourceMapper = { getOriginalPosition: identity, getGeneratedPosition: identity };
 
     export interface SourceMapDecodeHost {
-        readFile(path: string): string | undefined;
+        readFile(path: string): Promise<string | undefined>;
         fileExists(path: string): boolean;
         getCanonicalFileName(path: string): string;
         log(text: string): void;
@@ -71,8 +71,8 @@ namespace ts.sourcemaps {
             getGeneratedPosition
         };
 
-        function getGeneratedPosition(loc: SourceMappableLocation): SourceMappableLocation {
-            const maps = getSourceOrderedMappings();
+        async function getGeneratedPosition(loc: SourceMappableLocation): Promise<SourceMappableLocation> {
+            const maps = await getSourceOrderedMappings();
             if (!length(maps)) return loc;
             let targetIndex = binarySearch(maps, { sourcePath: loc.fileName, sourcePosition: loc.position }, identity, compareProcessedPositionSourcePositions);
             if (targetIndex < 0 && maps.length > 0) {
@@ -85,8 +85,8 @@ namespace ts.sourcemaps {
             return { fileName: toPath(map.file!, sourceRoot, host.getCanonicalFileName), position: maps[targetIndex].emittedPosition }; // Closest pos
         }
 
-        function getOriginalPosition(loc: SourceMappableLocation): SourceMappableLocation {
-            const maps = getGeneratedOrderedMappings();
+        async function getOriginalPosition(loc: SourceMappableLocation): Promise<SourceMappableLocation> {
+            const maps = await getGeneratedOrderedMappings();
             if (!length(maps)) return loc;
             let targetIndex = binarySearch(maps, { emittedPosition: loc.position }, identity, compareProcessedPositionEmittedPositions);
             if (targetIndex < 0 && maps.length > 0) {
@@ -96,36 +96,36 @@ namespace ts.sourcemaps {
             return { fileName: toPath(maps[targetIndex].sourcePath, sourceRoot, host.getCanonicalFileName), position: maps[targetIndex].sourcePosition }; // Closest pos
         }
 
-        function getSourceFileLike(fileName: string, location: string): SourceFileLike | undefined {
+        async function getSourceFileLike(fileName: string, location: string): Promise<SourceFileLike | undefined> {
             // Lookup file in program, if provided
             const path = toPath(fileName, location, host.getCanonicalFileName);
             const file = program && program.getSourceFile(path);
             // file returned here could be .d.ts when asked for .ts file if projectReferences and module resolution created this source file
             if (!file || file.resolvedPath !== path) {
                 // Otherwise check the cache (which may hit disk)
-                return fallbackCache.get(path);
+                return await fallbackCache.get(path);
             }
             return file;
         }
 
-        function getPositionOfLineAndCharacterUsingName(fileName: string, directory: string, line: number, character: number) {
-            const file = getSourceFileLike(fileName, directory);
+        async function getPositionOfLineAndCharacterUsingName(fileName: string, directory: string, line: number, character: number) {
+            const file = await getSourceFileLike(fileName, directory);
             if (!file) {
                 return -1;
             }
             return getPositionOfLineAndCharacter(file, line, character);
         }
 
-        function getDecodedMappings() {
-            return decodedMappings || (decodedMappings = calculateDecodedMappings(map, processPosition, host));
+        async function getDecodedMappings() {
+            return decodedMappings || (decodedMappings = await calculateDecodedMappings(map, processPosition, host));
         }
 
-        function getSourceOrderedMappings() {
-            return sourceOrderedMappings || (sourceOrderedMappings = getDecodedMappings().slice().sort(compareProcessedPositionSourcePositions));
+        async function getSourceOrderedMappings() {
+            return sourceOrderedMappings || (sourceOrderedMappings = (await getDecodedMappings()).slice().sort(compareProcessedPositionSourcePositions));
         }
 
-        function getGeneratedOrderedMappings() {
-            return generatedOrderedMappings || (generatedOrderedMappings = getDecodedMappings().slice().sort(compareProcessedPositionEmittedPositions));
+        async function getGeneratedOrderedMappings() {
+            return generatedOrderedMappings || (generatedOrderedMappings = (await getDecodedMappings()).slice().sort(compareProcessedPositionEmittedPositions));
         }
 
         function compareProcessedPositionSourcePositions(a: ProcessedSourceMapPosition, b: ProcessedSourceMapPosition) {
@@ -137,11 +137,11 @@ namespace ts.sourcemaps {
             return compareValues(a.emittedPosition, b.emittedPosition);
         }
 
-        function processPosition(position: RawSourceMapPosition): ProcessedSourceMapPosition {
+        async function processPosition(position: RawSourceMapPosition): Promise<ProcessedSourceMapPosition> {
             const sourcePath = map.sources[position.sourceIndex];
             return {
-                emittedPosition: getPositionOfLineAndCharacterUsingName(map.file!, currentDirectory, position.emittedLine, position.emittedColumn),
-                sourcePosition: getPositionOfLineAndCharacterUsingName(sourcePath, sourceRoot, position.sourceLine, position.sourceColumn),
+                emittedPosition: await getPositionOfLineAndCharacterUsingName(map.file!, currentDirectory, position.emittedLine, position.emittedColumn),
+                sourcePosition: await getPositionOfLineAndCharacterUsingName(sourcePath, sourceRoot, position.sourceLine, position.sourceColumn),
                 sourcePath,
                 // TODO: Consider using `name` field to remap the expected identifier to scan for renames to handle another tool renaming oout output
                 // name: position.nameIndex ? map.names[position.nameIndex] : undefined
@@ -191,9 +191,12 @@ namespace ts.sourcemaps {
         };
     }
 
-    function calculateDecodedMappings<T>(map: SourceMapData, processPosition: (position: RawSourceMapPosition) => T, host?: { log?(s: string): void }): T[] {
+    async function calculateDecodedMappings<T>(map: SourceMapData, processPosition: (position: RawSourceMapPosition) => Promise<T>, host?: { log?(s: string): void }): Promise<T[]> {
         const decoder = decodeMappings(map);
-        const positions = arrayFrom(decoder, processPosition);
+        const positions: T[] = []
+        for (let { value, done } = decoder.next(); !done; { value, done } = decoder.next()) {
+            positions.push(await processPosition(value));
+        }
         if (decoder.error) {
             if (host && host.log) {
                 host.log(`Encountered error while decoding sourcemap: ${decoder.error}`);

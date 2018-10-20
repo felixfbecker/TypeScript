@@ -3966,7 +3966,7 @@ namespace ts {
         return getStringFromExpandedCharCodes(expandedCharCodes);
     }
 
-    export function readJson(path: string, host: { readFile(fileName: string): string | undefined }): object {
+    export function readJson(path: string, host: { readFile(fileName: string): Promise<string | undefined> }): object {
         try {
             const jsonText = host.readFile(path);
             if (!jsonText) return {};
@@ -4764,7 +4764,7 @@ namespace ts {
      */
     export function validateLocaleAndSetLanguage(
         locale: string,
-        sys: { getExecutingFilePath(): string, resolvePath(path: string): string, fileExists(fileName: string): boolean, readFile(fileName: string): string | undefined },
+        sys: { getExecutingFilePath(): string, resolvePath(path: string): string, fileExists(fileName: string): boolean, readFile(fileName: string): Promise<string | undefined> },
         errors?: Push<Diagnostic>) {
         const matchResult = /^([a-z]+)([_\-]([a-z]+))?$/.exec(locale.toLowerCase());
 

@@ -321,7 +321,7 @@ namespace ts {
          * Use to read file text for source files and
          * if resolveModuleNames is not provided (complier is in charge of module resolution) then module files as well
          */
-        readFile(path: string, encoding?: string): string | undefined;
+        readFile(path: string, encoding?: string): Promise<string | undefined>;
 
         /** If provided, used for module resolution as well as to handle directory structure */
         directoryExists?(path: string): boolean;
@@ -465,7 +465,7 @@ namespace ts {
         const useCaseSensitiveFileNames = host.useCaseSensitiveFileNames();
         const currentDirectory = host.getCurrentDirectory();
         const getCurrentDirectory = () => currentDirectory;
-        const readFile: (path: string, encoding?: string) => string | undefined = (path, encoding) => host.readFile(path, encoding);
+        const readFile: (path: string, encoding?: string) => Promise<string | undefined> = (path, encoding) => host.readFile(path, encoding);
         const { configFileName, optionsToExtend: optionsToExtendForConfigFile = {}, createProgram } = host;
         let { rootFiles: rootFileNames, options: compilerOptions, projectReferences } = host;
         let configFileSpecs: ConfigFileSpecs;
@@ -497,7 +497,7 @@ namespace ts {
         if (configFileName && !host.configFileParsingResult) {
             newLine = getNewLineCharacter(optionsToExtendForConfigFile, () => host.getNewLine());
             Debug.assert(!rootFileNames);
-            parseConfigFile();
+            await parseConfigFile();
             newLine = updateNewLine();
         }
 
@@ -839,14 +839,14 @@ namespace ts {
             synchronizeProgram();
         }
 
-        function reloadConfigFile() {
+        async function reloadConfigFile() {
             writeLog(`Reloading config file: ${configFileName}`);
             reloadLevel = ConfigFileProgramReloadLevel.None;
 
             if (cachedDirectoryStructureHost) {
                 cachedDirectoryStructureHost.clearCache();
             }
-            parseConfigFile();
+            await parseConfigFile();
             hasChangedCompilerOptions = true;
             synchronizeProgram();
 
@@ -854,8 +854,8 @@ namespace ts {
             watchConfigFileWildCardDirectories();
         }
 
-        function parseConfigFile() {
-            setConfigFileParsingResult(getParsedCommandLineOfConfigFile(configFileName, optionsToExtendForConfigFile, parseConfigFileHost)!); // TODO: GH#18217
+        async function parseConfigFile() {
+            setConfigFileParsingResult(await getParsedCommandLineOfConfigFile(configFileName, optionsToExtendForConfigFile, parseConfigFileHost)!); // TODO: GH#18217
         }
 
         function setConfigFileParsingResult(configFileParseResult: ParsedCommandLine) {

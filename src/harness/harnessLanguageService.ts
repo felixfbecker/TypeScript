@@ -243,7 +243,7 @@ namespace Harness.LanguageService {
             return this.sys.readDirectory(path, extensions, exclude, include, depth);
         }
 
-        readFile(path: string): string | undefined {
+        readFile(path: string): Promise<string | undefined> {
             return this.sys.readFile(path);
         }
 
@@ -664,7 +664,7 @@ namespace Harness.LanguageService {
             this.writeMessage(message);
         }
 
-        readFile(fileName: string): string | undefined {
+        readFile(fileName: string): Promise<string | undefined> {
             if (ts.stringContains(fileName, Compiler.defaultLibFileName)) {
                 fileName = Compiler.defaultLibFileName;
             }

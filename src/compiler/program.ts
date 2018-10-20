@@ -80,11 +80,11 @@ namespace ts {
             return system.useCaseSensitiveFileNames ? fileName : fileName.toLowerCase();
         }
 
-        function getSourceFile(fileName: string, languageVersion: ScriptTarget, onError?: (message: string) => void): SourceFile | undefined {
+        async function getSourceFile(fileName: string, languageVersion: ScriptTarget, onError?: (message: string) => void): Promise<SourceFile | undefined> {
             let text: string | undefined;
             try {
                 performance.mark("beforeIORead");
-                text = system.readFile(fileName, options.charset);
+                text = await system.readFile(fileName, options.charset);
                 performance.mark("afterIORead");
                 performance.measure("I/O Read", "beforeIORead", "afterIORead");
             }
@@ -545,7 +545,7 @@ namespace ts {
      * @param createProgramOptions - The options for creating a program.
      * @returns A 'Program' object.
      */
-    export function createProgram(createProgramOptions: CreateProgramOptions): Program;
+    export function createProgram(createProgramOptions: CreateProgramOptions): Promise<Program>;
     /**
      * Create a new 'Program' instance. A Program is an immutable collection of 'SourceFile's and a 'CompilerOptions'
      * that represent a compilation unit.
@@ -560,8 +560,8 @@ namespace ts {
      * @param configFileParsingDiagnostics - error during config file parsing
      * @returns A 'Program' object.
      */
-    export function createProgram(rootNames: ReadonlyArray<string>, options: CompilerOptions, host?: CompilerHost, oldProgram?: Program, configFileParsingDiagnostics?: ReadonlyArray<Diagnostic>): Program;
-    export function createProgram(rootNamesOrOptions: ReadonlyArray<string> | CreateProgramOptions, _options?: CompilerOptions, _host?: CompilerHost, _oldProgram?: Program, _configFileParsingDiagnostics?: ReadonlyArray<Diagnostic>): Program {
+    export function createProgram(rootNames: ReadonlyArray<string>, options: CompilerOptions, host?: CompilerHost, oldProgram?: Program, configFileParsingDiagnostics?: ReadonlyArray<Diagnostic>): Promise<Program>;
+    export async function createProgram(rootNamesOrOptions: ReadonlyArray<string> | CreateProgramOptions, _options?: CompilerOptions, _host?: CompilerHost, _oldProgram?: Program, _configFileParsingDiagnostics?: ReadonlyArray<Diagnostic>): Promise<Program> {
         const createProgramOptions = isArray(rootNamesOrOptions) ? createCreateProgramOptions(rootNamesOrOptions, _options!, _host, _oldProgram, _configFileParsingDiagnostics) : rootNamesOrOptions; // TODO: GH#18217
         const { rootNames, options, configFileParsingDiagnostics, projectReferences } = createProgramOptions;
         let { oldProgram } = createProgramOptions;
@@ -666,14 +666,14 @@ namespace ts {
         let projectReferenceRedirects: ParsedCommandLine[] | undefined;
 
         const shouldCreateNewSourceFile = shouldProgramCreateNewSourceFiles(oldProgram, options);
-        const structuralIsReused = tryReuseStructureFromOldProgram();
+        const structuralIsReused = await tryReuseStructureFromOldProgram();
         if (structuralIsReused !== StructureIsReused.Completely) {
             processingDefaultLibFiles = [];
             processingOtherFiles = [];
 
             if (projectReferences) {
                 for (const ref of projectReferences) {
-                    const parsedRef = parseProjectReferenceConfigFile(ref);
+                    const parsedRef = await parseProjectReferenceConfigFile(ref);
                     resolvedProjectReferences!.push(parsedRef);
                     if (parsedRef) {
                         const out = parsedRef.commandLine.options.outFile || parsedRef.commandLine.options.out;
@@ -697,7 +697,7 @@ namespace ts {
                 const containingFilename = combinePaths(containingDirectory, "__inferred type names__.ts");
                 const resolutions = resolveTypeReferenceDirectiveNamesWorker(typeReferences, containingFilename);
                 for (let i = 0; i < typeReferences.length; i++) {
-                    processTypeReferenceDirective(typeReferences[i], resolutions[i]);
+                    await processTypeReferenceDirective(typeReferences[i], resolutions[i]);
                 }
             }
 
@@ -1001,7 +1001,7 @@ namespace ts {
             }
         }
 
-        function tryReuseStructureFromOldProgram(): StructureIsReused {
+        async function tryReuseStructureFromOldProgram(): Promise<StructureIsReused> {
             if (!oldProgram) {
                 return StructureIsReused.Not;
             }
@@ -1040,7 +1040,7 @@ namespace ts {
                 Debug.assert(!!oldRefs);
                 for (let i = 0; i < projectReferences.length; i++) {
                     const oldRef = oldRefs![i];
-                    const newRef = parseProjectReferenceConfigFile(projectReferences[i]);
+                    const newRef = await parseProjectReferenceConfigFile(projectReferences[i]);
                     if (oldRef) {
                         if (!newRef || newRef.sourceFile !== oldRef.sourceFile) {
                             // Resolved project reference has gone missing or changed
@@ -1080,7 +1080,7 @@ namespace ts {
             for (const oldSourceFile of oldSourceFiles) {
                 let newSourceFile = host.getSourceFileByPath
                     ? host.getSourceFileByPath(oldSourceFile.fileName, oldSourceFile.resolvedPath, options.target!, /*onError*/ undefined, shouldCreateNewSourceFile)
-                    : host.getSourceFile(oldSourceFile.fileName, options.target!, /*onError*/ undefined, shouldCreateNewSourceFile); // TODO: GH#18217
+                    : await host.getSourceFile(oldSourceFile.fileName, options.target!, /*onError*/ undefined, shouldCreateNewSourceFile); // TODO: GH#18217
 
                 if (!newSourceFile) {
                     return oldProgram.structureIsReused = StructureIsReused.Not;
@@ -1301,7 +1301,7 @@ namespace ts {
             return projectReferences;
         }
 
-        function getPrependNodes(): InputFiles[] {
+        async function getPrependNodes(): Promise<InputFiles[]> {
             if (!projectReferences) {
                 return emptyArray;
             }
@@ -1316,12 +1316,12 @@ namespace ts {
                     if (!out) continue;
 
                     const dtsFilename = changeExtension(out, ".d.ts");
-                    const js = host.readFile(out) || `/* Input file ${out} was missing */\r\n`;
+                    const js = await host.readFile(out) || `/* Input file ${out} was missing */\r\n`;
                     const jsMapPath = out + ".map"; // TODO: try to read sourceMappingUrl comment from the file
-                    const jsMap = host.readFile(jsMapPath);
-                    const dts = host.readFile(dtsFilename) || `/* Input file ${dtsFilename} was missing */\r\n`;
+                    const jsMap = await host.readFile(jsMapPath);
+                    const dts = await host.readFile(dtsFilename) || `/* Input file ${dtsFilename} was missing */\r\n`;
                     const dtsMapPath = dtsFilename + ".map";
-                    const dtsMap = host.readFile(dtsMapPath);
+                    const dtsMap = await host.readFile(dtsMapPath);
                     const node = createInputFiles(js, dts, jsMap && jsMapPath, jsMap, dtsMap && dtsMapPath, dtsMap);
                     nodes.push(node);
                 }
@@ -1373,7 +1373,7 @@ namespace ts {
             return hasEmitBlockingDiagnostics.has(toPath(emitFileName));
         }
 
-        function emitWorker(program: Program, sourceFile: SourceFile | undefined, writeFileCallback: WriteFileCallback | undefined, cancellationToken: CancellationToken | undefined, emitOnlyDtsFiles?: boolean, customTransformers?: CustomTransformers): EmitResult {
+        async function emitWorker(program: Program, sourceFile: SourceFile | undefined, writeFileCallback: WriteFileCallback | undefined, cancellationToken: CancellationToken | undefined, emitOnlyDtsFiles?: boolean, customTransformers?: CustomTransformers): Promise<EmitResult> {
             let declarationDiagnostics: ReadonlyArray<Diagnostic> = [];
 
             if (!emitOnlyDtsFiles) {
@@ -1420,7 +1420,7 @@ namespace ts {
             performance.mark("beforeEmit");
 
             const transformers = emitOnlyDtsFiles ? [] : getTransformers(options, customTransformers);
-            const emitResult = emitFiles(
+            const emitResult = await emitFiles(
                 emitResolver,
                 getEmitHost(writeFileCallback),
                 sourceFile!, // TODO: GH#18217
@@ -1954,15 +1954,15 @@ namespace ts {
         }
 
         /** This should have similar behavior to 'processSourceFile' without diagnostics or mutation. */
-        function getSourceFileFromReference(referencingFile: SourceFile, ref: FileReference): SourceFile | undefined {
-            return getSourceFileFromReferenceWorker(resolveTripleslashReference(ref.fileName, referencingFile.fileName), fileName => filesByName.get(toPath(fileName)));
+        async function getSourceFileFromReference(referencingFile: SourceFile, ref: FileReference): Promise<SourceFile | undefined> {
+            return await getSourceFileFromReferenceWorker(resolveTripleslashReference(ref.fileName, referencingFile.fileName), async fileName => filesByName.get(toPath(fileName)));
         }
 
-        function getSourceFileFromReferenceWorker(
+        async function getSourceFileFromReferenceWorker(
             fileName: string,
-            getSourceFile: (fileName: string) => SourceFile | undefined,
+            getSourceFile: (fileName: string) => Promise<SourceFile | undefined>,
             fail?: (diagnostic: DiagnosticMessage, ...argument: string[]) => void,
-            refFile?: SourceFile): SourceFile | undefined {
+            refFile?: SourceFile): Promise<SourceFile | undefined> {
 
             if (hasExtension(fileName)) {
                 if (!options.allowNonTsExtensions && !forEach(supportedExtensionsWithJsonIfResolveJsonModule, extension => fileExtensionIs(host.getCanonicalFileName(fileName), extension))) {
@@ -1970,7 +1970,7 @@ namespace ts {
                     return undefined;
                 }
 
-                const sourceFile = getSourceFile(fileName);
+                const sourceFile = await getSourceFile(fileName);
                 if (fail) {
                     if (!sourceFile) {
                         const redirect = getProjectReferenceRedirect(fileName);
@@ -2046,7 +2046,7 @@ namespace ts {
         }
 
         // Get source file from normalized fileName
-        function findSourceFile(fileName: string, path: Path, isDefaultLib: boolean, ignoreNoDefaultLib: boolean, refFile: SourceFile, refPos: number, refEnd: number, packageId: PackageId | undefined): SourceFile | undefined {
+        async function findSourceFile(fileName: string, path: Path, isDefaultLib: boolean, ignoreNoDefaultLib: boolean, refFile: SourceFile, refPos: number, refEnd: number, packageId: PackageId | undefined): Promise<SourceFile | undefined> {
             const originalFileName = fileName;
             if (filesByName.has(path)) {
                 const file = filesByName.get(path);
@@ -2105,7 +2105,7 @@ namespace ts {
             }
 
             // We haven't looked for this file, do so now and cache result
-            const file = host.getSourceFile(fileName, options.target!, hostErrorMessage => { // TODO: GH#18217
+            const file = await host.getSourceFile(fileName, options.target!, hostErrorMessage => { // TODO: GH#18217
                 if (refFile !== undefined && refPos !== undefined && refEnd !== undefined) {
                     fileProcessingDiagnostics.add(createFileDiagnostic(refFile, refPos, refEnd - refPos,
                         Diagnostics.Cannot_read_file_0_Colon_1, fileName, hostErrorMessage));
@@ -2228,8 +2228,8 @@ namespace ts {
             }
         }
 
-        function processTypeReferenceDirective(typeReferenceDirective: string, resolvedTypeReferenceDirective: ResolvedTypeReferenceDirective,
-            refFile?: SourceFile, refPos?: number, refEnd?: number): void {
+        async function processTypeReferenceDirective(typeReferenceDirective: string, resolvedTypeReferenceDirective: ResolvedTypeReferenceDirective,
+            refFile?: SourceFile, refPos?: number, refEnd?: number): Promise<void> {
 
             // If we already found this library as a primary reference - nothing to do
             const previousResolution = resolvedTypeReferenceDirectives.get(typeReferenceDirective);
@@ -2248,7 +2248,7 @@ namespace ts {
                     if (previousResolution) {
                         // Don't bother reading the file again if it's the same file.
                         if (resolvedTypeReferenceDirective.resolvedFileName !== previousResolution.resolvedFileName) {
-                            const otherFileText = host.readFile(resolvedTypeReferenceDirective.resolvedFileName!);
+                            const otherFileText = await host.readFile(resolvedTypeReferenceDirective.resolvedFileName!);
                             if (otherFileText !== getSourceFile(previousResolution.resolvedFileName!)!.text) {
                                 fileProcessingDiagnostics.add(createDiagnostic(refFile!, refPos!, refEnd!, // TODO: GH#18217
                                     Diagnostics.Conflicting_definitions_for_0_found_at_1_and_2_Consider_installing_a_specific_version_of_this_library_to_resolve_the_conflict,
@@ -2306,7 +2306,7 @@ namespace ts {
             return host.getCanonicalFileName(fileName);
         }
 
-        function processImportedModules(file: SourceFile) {
+        async function processImportedModules(file: SourceFile) {
             collectExternalModuleReferences(file);
             if (file.imports.length || file.moduleAugmentations.length) {
                 // Because global augmentation doesn't have string literal name, we can check for global augmentation as such.
@@ -2353,7 +2353,7 @@ namespace ts {
                     else if (shouldAddFile) {
                         const path = toPath(resolvedFileName);
                         const pos = skipTrivia(file.text, file.imports[i].pos);
-                        findSourceFile(resolvedFileName, path, /*isDefaultLib*/ false, /*ignoreNoDefaultLib*/ false, file, pos, file.imports[i].end, resolution.packageId);
+                        await findSourceFile(resolvedFileName, path, /*isDefaultLib*/ false, /*ignoreNoDefaultLib*/ false, file, pos, file.imports[i].end, resolution.packageId);
                     }
 
                     if (isFromNodeModulesSearch) {
@@ -2389,17 +2389,20 @@ namespace ts {
             return allFilesBelongToPath;
         }
 
-        function parseProjectReferenceConfigFile(ref: ProjectReference): { commandLine: ParsedCommandLine, sourceFile: SourceFile } | undefined {
+        async function parseProjectReferenceConfigFile(ref: ProjectReference): Promise<{
+            commandLine: ParsedCommandLine;
+            sourceFile: SourceFile;
+        } | undefined> {
             // The actual filename (i.e. add "/tsconfig.json" if necessary)
             const refPath = resolveProjectReferencePath(ref);
             // An absolute path pointing to the containing directory of the config file
             const basePath = getNormalizedAbsolutePath(getDirectoryPath(refPath), host.getCurrentDirectory());
-            const sourceFile = host.getSourceFile(refPath, ScriptTarget.JSON) as JsonSourceFile | undefined;
+            const sourceFile = await host.getSourceFile(refPath, ScriptTarget.JSON) as JsonSourceFile | undefined;
             if (sourceFile === undefined) {
                 return undefined;
             }
             sourceFile.path = toPath(refPath);
-            const commandLine = parseJsonSourceFileConfigFileContent(sourceFile, configParsingHost, basePath, /*existingOptions*/ undefined, refPath);
+            const commandLine = await parseJsonSourceFileConfigFileContent(sourceFile, configParsingHost, basePath, /*existingOptions*/ undefined, refPath);
             return { commandLine, sourceFile };
         }
 

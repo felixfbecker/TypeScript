@@ -12,7 +12,7 @@ namespace ts {
      *   If an array, the full list of source files to emit.
      *   Else, calls `getSourceFilesToEmit` with the (optional) target source file to determine the list of source files to emit.
      */
-    export function forEachEmittedFile<T>(
+    export async function forEachEmittedFile<T>(
         host: EmitHost, action: (emitFileNames: EmitFileNames, sourceFileOrBundle: SourceFile | Bundle) => T,
         sourceFilesOrTargetSourceFile?: ReadonlyArray<SourceFile> | SourceFile,
         emitOnlyDtsFiles = false) {
@@ -20,7 +20,7 @@ namespace ts {
         const options = host.getCompilerOptions();
         if (options.outFile || options.out) {
             if (sourceFiles.length) {
-                const bundle = createBundle(sourceFiles, host.getPrependNodes());
+                const bundle = createBundle(sourceFiles, await host.getPrependNodes());
                 const result = action(getOutputPathsFor(bundle, host, emitOnlyDtsFiles), bundle);
                 if (result) {
                     return result;
@@ -100,7 +100,7 @@ namespace ts {
 
     /*@internal*/
     // targetSourceFile is when users only want one file in entire project to be emitted. This is used in compileOnSave feature
-    export function emitFiles(resolver: EmitResolver, host: EmitHost, targetSourceFile: SourceFile, emitOnlyDtsFiles?: boolean, transformers?: TransformerFactory<Bundle | SourceFile>[], declarationTransformers?: TransformerFactory<Bundle | SourceFile>[]): EmitResult {
+    export async function emitFiles(resolver: EmitResolver, host: EmitHost, targetSourceFile: SourceFile, emitOnlyDtsFiles?: boolean, transformers?: TransformerFactory<Bundle | SourceFile>[], declarationTransformers?: TransformerFactory<Bundle | SourceFile>[]): Promise<EmitResult> {
         const compilerOptions = host.getCompilerOptions();
         const sourceMapDataList: SourceMapData[] | undefined = (compilerOptions.sourceMap || compilerOptions.inlineSourceMap || getAreDeclarationMapsEnabled(compilerOptions)) ? [] : undefined;
         const emittedFilesList: string[] | undefined = compilerOptions.listEmittedFiles ? [] : undefined;
@@ -122,7 +122,7 @@ namespace ts {
 
         // Emit each output file
         performance.mark("beforePrint");
-        forEachEmittedFile(host, emitSourceFileOrBundle, getSourceFilesToEmit(host, targetSourceFile), emitOnlyDtsFiles);
+        await forEachEmittedFile(host, emitSourceFileOrBundle, getSourceFilesToEmit(host, targetSourceFile), emitOnlyDtsFiles);
         performance.measure("printTime", "beforePrint");
 
 
@@ -553,7 +553,7 @@ namespace ts {
                     if (onEmitNode) {
                         return pipelineEmitWithNotification;
                     }
-                    // falls through
+                // falls through
 
                 case PipelinePhase.Comments:
                     if (emitNodeWithComments && hint !== EmitHint.SourceFile) {
@@ -565,7 +565,7 @@ namespace ts {
                     if (onEmitSourceMapOfNode && hint !== EmitHint.SourceFile) {
                         return pipelineEmitWithSourceMap;
                     }
-                    // falls through
+                // falls through
 
                 case PipelinePhase.Emit:
                     return pipelineEmitWithHint;

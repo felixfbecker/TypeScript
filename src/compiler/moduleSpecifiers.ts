@@ -35,7 +35,7 @@ namespace ts.moduleSpecifiers {
         };
     }
 
-    export function updateModuleSpecifier(
+    export async function updateModuleSpecifier(
         compilerOptions: CompilerOptions,
         importingSourceFileName: Path,
         toFileName: string,
@@ -43,14 +43,14 @@ namespace ts.moduleSpecifiers {
         files: ReadonlyArray<SourceFile>,
         redirectTargetsMap: RedirectTargetsMap,
         oldImportSpecifier: string,
-    ): string | undefined {
-        const res = getModuleSpecifierWorker(compilerOptions, importingSourceFileName, toFileName, host, files, redirectTargetsMap, getPreferencesForUpdate(compilerOptions, oldImportSpecifier));
+    ): Promise<string | undefined> {
+        const res = await getModuleSpecifierWorker(compilerOptions, importingSourceFileName, toFileName, host, files, redirectTargetsMap, getPreferencesForUpdate(compilerOptions, oldImportSpecifier));
         if (res === oldImportSpecifier) return undefined;
         return res;
     }
 
     // Note: importingSourceFile is just for usesJsExtensionOnImports
-    export function getModuleSpecifier(
+    export async function getModuleSpecifier(
         compilerOptions: CompilerOptions,
         importingSourceFile: SourceFile,
         importingSourceFileName: Path,
@@ -59,11 +59,11 @@ namespace ts.moduleSpecifiers {
         files: ReadonlyArray<SourceFile>,
         preferences: UserPreferences = {},
         redirectTargetsMap: RedirectTargetsMap,
-    ): string {
-        return getModuleSpecifierWorker(compilerOptions, importingSourceFileName, toFileName, host, files, redirectTargetsMap, getPreferences(preferences, compilerOptions, importingSourceFile));
+    ): Promise<string> {
+        return await getModuleSpecifierWorker(compilerOptions, importingSourceFileName, toFileName, host, files, redirectTargetsMap, getPreferences(preferences, compilerOptions, importingSourceFile));
     }
 
-    function getModuleSpecifierWorker(
+    async function getModuleSpecifierWorker(
         compilerOptions: CompilerOptions,
         importingSourceFileName: Path,
         toFileName: string,
@@ -71,15 +71,20 @@ namespace ts.moduleSpecifiers {
         files: ReadonlyArray<SourceFile>,
         redirectTargetsMap: RedirectTargetsMap,
         preferences: Preferences
-    ): string {
+    ): Promise<string> {
         const info = getInfo(importingSourceFileName, host);
         const modulePaths = getAllModulePaths(files, importingSourceFileName, toFileName, info.getCanonicalFileName, host, redirectTargetsMap);
-        return firstDefined(modulePaths, moduleFileName => tryGetModuleNameAsNodeModule(moduleFileName, info, host, compilerOptions)) ||
-            getLocalModuleSpecifier(toFileName, info, compilerOptions, preferences);
+        for (const moduleFileName of modulePaths) {
+            const moduleName = await tryGetModuleNameAsNodeModule(moduleFileName, info, host, compilerOptions);
+            if (moduleName !== undefined) {
+                return moduleName;
+            }
+        }
+        return getLocalModuleSpecifier(toFileName, info, compilerOptions, preferences);
     }
 
     // Returns an import for each symlink and for the realpath.
-    export function getModuleSpecifiers(
+    export async function getModuleSpecifiers(
         moduleSymbol: Symbol,
         compilerOptions: CompilerOptions,
         importingSourceFile: SourceFile,
@@ -87,7 +92,7 @@ namespace ts.moduleSpecifiers {
         files: ReadonlyArray<SourceFile>,
         userPreferences: UserPreferences,
         redirectTargetsMap: RedirectTargetsMap,
-    ): ReadonlyArray<string> {
+    ): Promise<ReadonlyArray<string>> {
         const ambient = tryGetModuleNameFromAmbientModule(moduleSymbol);
         if (ambient) return [ambient];
 
@@ -96,7 +101,13 @@ namespace ts.moduleSpecifiers {
         const modulePaths = getAllModulePaths(files, importingSourceFile.path, moduleSourceFile.fileName, info.getCanonicalFileName, host, redirectTargetsMap);
 
         const preferences = getPreferences(userPreferences, compilerOptions, importingSourceFile);
-        const global = mapDefined(modulePaths, moduleFileName => tryGetModuleNameAsNodeModule(moduleFileName, info, host, compilerOptions));
+        const global: string[] = []
+        for (const moduleFileName of modulePaths) {
+            const moduleName = await tryGetModuleNameAsNodeModule(moduleFileName, info, host, compilerOptions);
+            if (moduleName !== undefined) {
+                global.push(moduleName);
+            }
+        }
         return global.length ? global : modulePaths.map(moduleFileName => getLocalModuleSpecifier(moduleFileName, info, compilerOptions, preferences));
     }
 
@@ -259,7 +270,7 @@ namespace ts.moduleSpecifiers {
         return removeFileExtension(relativePath);
     }
 
-    function tryGetModuleNameAsNodeModule(moduleFileName: string, { getCanonicalFileName, sourceDirectory }: Info, host: ModuleSpecifierResolutionHost, options: CompilerOptions): string | undefined {
+    async function tryGetModuleNameAsNodeModule(moduleFileName: string, { getCanonicalFileName, sourceDirectory }: Info, host: ModuleSpecifierResolutionHost, options: CompilerOptions): Promise<string | undefined> {
         if (!host.fileExists || !host.readFile) {
             return undefined;
         }
@@ -271,7 +282,7 @@ namespace ts.moduleSpecifiers {
         const packageRootPath = moduleFileName.substring(0, parts.packageRootIndex);
         const packageJsonPath = combinePaths(packageRootPath, "package.json");
         const packageJsonContent = host.fileExists(packageJsonPath)
-            ? JSON.parse(host.readFile(packageJsonPath)!)
+            ? JSON.parse(await host.readFile(packageJsonPath)!)
             : undefined;
         const versionPaths = packageJsonContent && packageJsonContent.typesVersions
             ? getPackageJsonTypesVersionsPaths(packageJsonContent.typesVersions)

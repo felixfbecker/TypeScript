@@ -962,7 +962,7 @@ namespace ts {
         getOptionNameMap: () => OptionNameMap,
         [unknownOptionDiagnostic, optionTypeMismatchDiagnostic]: ParseCommandLineWorkerDiagnostics,
         commandLine: ReadonlyArray<string>,
-        readFile?: (path: string) => string | undefined) {
+        readFile?: (path: string) => Promise<string | undefined>) {
         const options = {} as OptionsBase;
         const fileNames: string[] = [];
         const errors: Diagnostic[] = [];
@@ -980,7 +980,7 @@ namespace ts {
                 const s = args[i];
                 i++;
                 if (s.charCodeAt(0) === CharacterCodes.at) {
-                    parseResponseFile(s.slice(1));
+                    await parseResponseFile(s.slice(1));
                 }
                 else if (s.charCodeAt(0) === CharacterCodes.minus) {
                     const opt = getOptionDeclarationFromName(getOptionNameMap, s.slice(s.charCodeAt(1) === CharacterCodes.minus ? 2 : 1), /*allowShort*/ true);
@@ -1037,8 +1037,8 @@ namespace ts {
             }
         }
 
-        function parseResponseFile(fileName: string) {
-            const text = readFile ? readFile(fileName) : sys.readFile(fileName);
+        async function parseResponseFile(fileName: string) {
+            const text = await (readFile ? readFile(fileName) : sys.readFile(fileName));
 
             if (!text) {
                 errors.push(createCompilerDiagnostic(Diagnostics.File_0_not_found, fileName));
@@ -1071,7 +1071,7 @@ namespace ts {
         }
     }
 
-    export function parseCommandLine(commandLine: ReadonlyArray<string>, readFile?: (path: string) => string | undefined): ParsedCommandLine {
+    export function parseCommandLine(commandLine: ReadonlyArray<string>, readFile?: (path: string) => Promise<string | undefined>): ParsedCommandLine {
         return parseCommandLineWorker(getOptionNameMap, [
             Diagnostics.Unknown_compiler_option_0,
             Diagnostics.Compiler_option_0_expects_an_argument
@@ -1275,10 +1275,10 @@ namespace ts {
     /**
      * Reads the config file, reports errors if any and exits if the config file cannot be found
      */
-    export function getParsedCommandLineOfConfigFile(configFileName: string, optionsToExtend: CompilerOptions, host: ParseConfigFileHost): ParsedCommandLine | undefined {
+    export async function getParsedCommandLineOfConfigFile(configFileName: string, optionsToExtend: CompilerOptions, host: ParseConfigFileHost): Promise<ParsedCommandLine | undefined> {
         let configFileText: string | undefined;
         try {
-            configFileText = host.readFile(configFileName);
+            configFileText = await host.readFile(configFileName);
         }
         catch (e) {
             const error = createCompilerDiagnostic(Diagnostics.Cannot_read_file_0_Colon_1, configFileName, e.message);
@@ -1300,8 +1300,11 @@ namespace ts {
      * Read tsconfig.json file
      * @param fileName The path to the config file
      */
-    export function readConfigFile(fileName: string, readFile: (path: string) => string | undefined): { config?: any; error?: Diagnostic } {
-        const textOrDiagnostic = tryReadFile(fileName, readFile);
+    export async function readConfigFile(fileName: string, readFile: (path: string) => Promise<string | undefined>): Promise<{
+        config?: any;
+        error?: Diagnostic;
+    }> {
+        const textOrDiagnostic = await tryReadFile(fileName, readFile);
         return isString(textOrDiagnostic) ? parseConfigFileTextToJson(fileName, textOrDiagnostic) : { config: {}, error: textOrDiagnostic };
     }
 
@@ -1322,15 +1325,15 @@ namespace ts {
      * Read tsconfig.json file
      * @param fileName The path to the config file
      */
-    export function readJsonConfigFile(fileName: string, readFile: (path: string) => string | undefined): TsConfigSourceFile {
-        const textOrDiagnostic = tryReadFile(fileName, readFile);
+    export async function readJsonConfigFile(fileName: string, readFile: (path: string) => Promise<string | undefined>): Promise<TsConfigSourceFile> {
+        const textOrDiagnostic = await tryReadFile(fileName, readFile);
         return isString(textOrDiagnostic) ? parseJsonText(fileName, textOrDiagnostic) : <TsConfigSourceFile>{ parseDiagnostics: [textOrDiagnostic] };
     }
 
-    function tryReadFile(fileName: string, readFile: (path: string) => string | undefined): string | Diagnostic {
+    async function tryReadFile(fileName: string, readFile: (path: string) => Promise<string | undefined>): Promise<string | Diagnostic> {
         let text: string | undefined;
         try {
-            text = readFile(fileName);
+            text = await readFile(fileName);
         }
         catch (e) {
             return createCompilerDiagnostic(Diagnostics.Cannot_read_file_0_Colon_1, fileName, e.message);
@@ -1819,8 +1822,8 @@ namespace ts {
      * @param basePath A root directory to resolve relative path entries in the config
      *    file to. e.g. outDir
      */
-    export function parseJsonConfigFileContent(json: any, host: ParseConfigHost, basePath: string, existingOptions?: CompilerOptions, configFileName?: string, resolutionStack?: Path[], extraFileExtensions?: ReadonlyArray<FileExtensionInfo>): ParsedCommandLine {
-        return parseJsonConfigFileContentWorker(json, /*sourceFile*/ undefined, host, basePath, existingOptions, configFileName, resolutionStack, extraFileExtensions);
+    export async function parseJsonConfigFileContent(json: any, host: ParseConfigHost, basePath: string, existingOptions?: CompilerOptions, configFileName?: string, resolutionStack?: Path[], extraFileExtensions?: ReadonlyArray<FileExtensionInfo>): Promise<ParsedCommandLine> {
+        return await parseJsonConfigFileContentWorker(json, /*sourceFile*/ undefined, host, basePath, existingOptions, configFileName, resolutionStack, extraFileExtensions);
     }
 
     /**
@@ -1830,8 +1833,8 @@ namespace ts {
      * @param basePath A root directory to resolve relative path entries in the config
      *    file to. e.g. outDir
      */
-    export function parseJsonSourceFileConfigFileContent(sourceFile: TsConfigSourceFile, host: ParseConfigHost, basePath: string, existingOptions?: CompilerOptions, configFileName?: string, resolutionStack?: Path[], extraFileExtensions?: ReadonlyArray<FileExtensionInfo>): ParsedCommandLine {
-        return parseJsonConfigFileContentWorker(/*json*/ undefined, sourceFile, host, basePath, existingOptions, configFileName, resolutionStack, extraFileExtensions);
+    export async function parseJsonSourceFileConfigFileContent(sourceFile: TsConfigSourceFile, host: ParseConfigHost, basePath: string, existingOptions?: CompilerOptions, configFileName?: string, resolutionStack?: Path[], extraFileExtensions?: ReadonlyArray<FileExtensionInfo>): Promise<ParsedCommandLine> {
+        return await parseJsonConfigFileContentWorker(/*json*/ undefined, sourceFile, host, basePath, existingOptions, configFileName, resolutionStack, extraFileExtensions);
     }
 
     /*@internal*/
@@ -1861,7 +1864,7 @@ namespace ts {
      *    file to. e.g. outDir
      * @param resolutionStack Only present for backwards-compatibility. Should be empty.
      */
-    function parseJsonConfigFileContentWorker(
+    async function parseJsonConfigFileContentWorker(
         json: any,
         sourceFile: TsConfigSourceFile | undefined,
         host: ParseConfigHost,
@@ -1870,11 +1873,11 @@ namespace ts {
         configFileName?: string,
         resolutionStack: Path[] = [],
         extraFileExtensions: ReadonlyArray<FileExtensionInfo> = [],
-    ): ParsedCommandLine {
+    ): Promise<ParsedCommandLine> {
         Debug.assert((json === undefined && sourceFile !== undefined) || (json !== undefined && sourceFile === undefined));
         const errors: Diagnostic[] = [];
 
-        const parsedConfig = parseConfig(json, sourceFile, host, basePath, configFileName, resolutionStack, errors);
+        const parsedConfig = await parseConfig(json, sourceFile, host, basePath, configFileName, resolutionStack, errors);
         const { raw } = parsedConfig;
         const options = extend(existingOptions, parsedConfig.options || {});
         options.configFilePath = configFileName && normalizeSlashes(configFileName);
@@ -2005,12 +2008,12 @@ namespace ts {
         return result.fileNames.length === 0 && canJsonReportNoInutFiles && (!resolutionStack || resolutionStack.length === 0);
     }
 
-     /*@internal*/
+    /*@internal*/
     export function canJsonReportNoInutFiles(raw: any) {
         return !hasProperty(raw, "files") && !hasProperty(raw, "references");
     }
 
-     /*@internal*/
+    /*@internal*/
     export function updateErrorForNoInputFiles(result: ExpandResult, configFileName: string, configFileSpecs: ConfigFileSpecs, configParseDiagnostics: Diagnostic[], canJsonReportNoInutFiles: boolean) {
         const existingErrors = configParseDiagnostics.length;
         if (shouldReportNoInputFiles(result, canJsonReportNoInutFiles)) {
@@ -2040,15 +2043,15 @@ namespace ts {
      * This *just* extracts options/include/exclude/files out of a config file.
      * It does *not* resolve the included files.
      */
-    function parseConfig(
-            json: any,
-            sourceFile: TsConfigSourceFile | undefined,
-            host: ParseConfigHost,
-            basePath: string,
-            configFileName: string | undefined,
-            resolutionStack: string[],
-            errors: Push<Diagnostic>,
-    ): ParsedTsconfig {
+    async function parseConfig(
+        json: any,
+        sourceFile: TsConfigSourceFile | undefined,
+        host: ParseConfigHost,
+        basePath: string,
+        configFileName: string | undefined,
+        resolutionStack: string[],
+        errors: Push<Diagnostic>,
+    ): Promise<ParsedTsconfig> {
         basePath = normalizeSlashes(basePath);
         const resolvedPath = getNormalizedAbsolutePath(configFileName || "", basePath);
 
@@ -2064,7 +2067,7 @@ namespace ts {
         if (ownConfig.extendedConfigPath) {
             // copy the resolution stack so it is never reused between branches in potential diamond-problem scenarios.
             resolutionStack = resolutionStack.concat([resolvedPath]);
-            const extendedConfig = getExtendedConfig(sourceFile, ownConfig.extendedConfigPath, host, basePath, resolutionStack, errors);
+            const extendedConfig = await getExtendedConfig(sourceFile, ownConfig.extendedConfigPath, host, basePath, resolutionStack, errors);
             if (extendedConfig && isSuccessfulParsedTsconfig(extendedConfig)) {
                 const baseRaw = extendedConfig.raw;
                 const raw = ownConfig.raw;
@@ -2204,15 +2207,15 @@ namespace ts {
         return extendedConfigPath;
     }
 
-    function getExtendedConfig(
+    async function getExtendedConfig(
         sourceFile: TsConfigSourceFile | undefined,
         extendedConfigPath: string,
         host: ParseConfigHost,
         basePath: string,
         resolutionStack: string[],
         errors: Push<Diagnostic>,
-    ): ParsedTsconfig | undefined {
-        const extendedResult = readJsonConfigFile(extendedConfigPath, path => host.readFile(path));
+    ): Promise<ParsedTsconfig | undefined> {
+        const extendedResult = await readJsonConfigFile(extendedConfigPath, path => host.readFile(path));
         if (sourceFile) {
             sourceFile.extendedSourceFiles = [extendedResult.fileName];
         }
@@ -2222,7 +2225,7 @@ namespace ts {
         }
 
         const extendedDirname = getDirectoryPath(extendedConfigPath);
-        const extendedConfig = parseConfig(/*json*/ undefined, extendedResult, host, extendedDirname,
+        const extendedConfig = await parseConfig(/*json*/ undefined, extendedResult, host, extendedDirname,
             getBaseFileName(extendedConfigPath), resolutionStack, errors);
         if (sourceFile && extendedResult.extendedSourceFiles) {
             sourceFile.extendedSourceFiles!.push(...extendedResult.extendedSourceFiles);

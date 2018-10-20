@@ -193,7 +193,7 @@ namespace fakes {
             return this.sys.directoryExists(directoryName);
         }
 
-        public readFile(path: string): string | undefined {
+        public readFile(path: string): Promise<string | undefined> {
             return this.sys.readFile(path);
         }
 
@@ -280,7 +280,7 @@ namespace fakes {
             return this.sys.readDirectory(path, extensions, exclude, include, depth);
         }
 
-        public readFile(path: string): string | undefined {
+        public readFile(path: string): Promise<string | undefined> {
             return this.sys.readFile(path);
         }
 

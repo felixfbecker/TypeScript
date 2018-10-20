@@ -353,7 +353,7 @@ namespace ts.server {
             return this.directoryStructureHost.readDirectory!(path, extensions, exclude, include, depth);
         }
 
-        readFile(fileName: string): string | undefined {
+        readFile(fileName: string): Promise<string | undefined> {
             return this.projectService.host.readFile(fileName);
         }
 

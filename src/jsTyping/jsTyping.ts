@@ -4,7 +4,7 @@ namespace ts.JsTyping {
     export interface TypingResolutionHost {
         directoryExists(path: string): boolean;
         fileExists(fileName: string): boolean;
-        readFile(path: string, encoding?: string): string | undefined;
+        readFile(path: string, encoding?: string): Promise<string | undefined>;
         readDirectory(rootDir: string, extensions: ReadonlyArray<string>, excludes: ReadonlyArray<string> | undefined, includes: ReadonlyArray<string> | undefined, depth?: number): string[];
     }
 

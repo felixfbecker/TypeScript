@@ -1182,7 +1182,7 @@ namespace vfs {
         directoryExists(path: string): boolean;
         fileExists(path: string): boolean;
         getFileSize(path: string): number;
-        readFile(path: string): string | undefined;
+        readFile(path: string): Promise<string | undefined>;
         getWorkspaceRoot(): string;
     }
 

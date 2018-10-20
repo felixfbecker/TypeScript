@@ -155,7 +155,7 @@ namespace ts.Completions.PathCompletions {
             // check for a version redirect
             const packageJsonPath = findPackageJson(baseDirectory, host);
             if (packageJsonPath) {
-                const packageJson = readJson(packageJsonPath, host as { readFile: (filename: string) => string | undefined });
+                const packageJson = readJson(packageJsonPath, host as { readFile: (filename: string) => Promise<string | undefined> });
                 const typesVersions = (packageJson as any).typesVersions;
                 if (typeof typesVersions === "object") {
                     const versionResult = getPackageJsonTypesVersionsPaths(typesVersions);
@@ -428,7 +428,7 @@ namespace ts.Completions.PathCompletions {
 
         const result: string[] = [];
         for (const packageJson of findPackageJsons(scriptPath, host)) {
-            const contents = readJson(packageJson, host as { readFile: (filename: string) => string | undefined }); // Cast to assert that readFile is defined
+            const contents = readJson(packageJson, host as { readFile: (filename: string) => Promise<string | undefined> }); // Cast to assert that readFile is defined
             // Provide completions for all non @types dependencies
             for (const key of nodeModulesDependencyKeys) {
                 const dependencies: object | undefined = (contents as any)[key];

@@ -78,7 +78,7 @@ namespace ts {
 
         getTypeRootsVersion?(): number;
         readDirectory(rootDir: string, extension: string, basePaths?: string, excludeEx?: string, includeFileEx?: string, includeDirEx?: string, depth?: number): string;
-        readFile(path: string, encoding?: string): string | undefined;
+        readFile(path: string, encoding?: string): Promise<string | undefined>;
         fileExists(path: string): boolean;
 
         getModuleResolutionsForFile?(fileName: string): string;
@@ -104,7 +104,7 @@ namespace ts {
         /**
          * Read arbitrary text files on disk, i.e. when resolution procedure needs the content of 'package.json' to determine location of bundled typings for node modules
          */
-        readFile(fileName: string): string | undefined;
+        readFile(fileName: string): Promise<string | undefined>;
         realpath?(path: string): string;
         trace(s: string): void;
         useCaseSensitiveFileNames?(): boolean;
@@ -474,7 +474,7 @@ namespace ts {
             ));
         }
 
-        public readFile(path: string, encoding?: string): string | undefined {
+        public readFile(path: string, encoding?: string): Promise<string | undefined> {
             return this.shimHost.readFile(path, encoding);
         }
 
@@ -517,7 +517,7 @@ namespace ts {
             return this.shimHost.fileExists(fileName);
         }
 
-        public readFile(fileName: string): string | undefined {
+        public readFile(fileName: string): Promise<string | undefined> {
             return this.shimHost.readFile(fileName);
         }
 

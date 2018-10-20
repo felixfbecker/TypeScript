@@ -1761,7 +1761,7 @@ declare namespace ts {
          * @param path The path to test.
          */
         fileExists(path: string): boolean;
-        readFile(path: string): string | undefined;
+        readFile(path: string): Promise<string | undefined>;
     }
     /**
      * Branded string for keeping track of when we've turned an ambiguous path
@@ -2599,7 +2599,7 @@ declare namespace ts {
     }
     interface ModuleResolutionHost {
         fileExists(fileName: string): boolean;
-        readFile(fileName: string): string | undefined;
+        readFile(fileName: string): Promise<string | undefined>;
         trace?(s: string): void;
         directoryExists?(directoryName: string): boolean;
         /**
@@ -3022,7 +3022,7 @@ declare namespace ts {
         useCaseSensitiveFileNames: boolean;
         write(s: string): void;
         writeOutputIsTTY?(): boolean;
-        readFile(path: string, encoding?: string): string | undefined;
+        readFile(path: string, encoding?: string): Promise<string | undefined>;
         getFileSize?(path: string): number;
         writeFile(path: string, data: string, writeByteOrderMark?: boolean): void;
         /**
@@ -3170,7 +3170,7 @@ declare namespace ts {
         getExecutingFilePath(): string;
         resolvePath(path: string): string;
         fileExists(fileName: string): boolean;
-        readFile(fileName: string): string | undefined;
+        readFile(fileName: string): Promise<string | undefined>;
     }, errors?: Push<Diagnostic>): void;
     function getOriginalNode(node: Node): Node;
     function getOriginalNode<T extends Node>(node: Node, nodeTest: (node: Node) => node is T): T;
@@ -3527,7 +3527,7 @@ declare namespace ts {
     function updateSourceFile(sourceFile: SourceFile, newText: string, textChangeRange: TextChangeRange, aggressiveChecks?: boolean): SourceFile;
 }
 declare namespace ts {
-    function parseCommandLine(commandLine: ReadonlyArray<string>, readFile?: (path: string) => string | undefined): ParsedCommandLine;
+    function parseCommandLine(commandLine: ReadonlyArray<string>, readFile?: (path: string) => Promise<string | undefined>): ParsedCommandLine;
     type DiagnosticReporter = (diagnostic: Diagnostic) => void;
     /**
      * Reports config file diagnostics
@@ -3552,7 +3552,7 @@ declare namespace ts {
      * Read tsconfig.json file
      * @param fileName The path to the config file
      */
-    function readConfigFile(fileName: string, readFile: (path: string) => string | undefined): {
+    function readConfigFile(fileName: string, readFile: (path: string) => Promise<string | undefined>): {
         config?: any;
         error?: Diagnostic;
     };
@@ -3569,7 +3569,7 @@ declare namespace ts {
      * Read tsconfig.json file
      * @param fileName The path to the config file
      */
-    function readJsonConfigFile(fileName: string, readFile: (path: string) => string | undefined): TsConfigSourceFile;
+    function readJsonConfigFile(fileName: string, readFile: (path: string) => Promise<string | undefined>): TsConfigSourceFile;
     /**
      * Convert the json syntax tree into the json value
      */
@@ -4370,7 +4370,7 @@ declare namespace ts {
          * Use to read file text for source files and
          * if resolveModuleNames is not provided (complier is in charge of module resolution) then module files as well
          */
-        readFile(path: string, encoding?: string): string | undefined;
+        readFile(path: string, encoding?: string): Promise<string | undefined>;
         /** If provided, used for module resolution as well as to handle directory structure */
         directoryExists?(path: string): boolean;
         /** If provided, used in resolutions as well as handling directory structure */
@@ -4650,7 +4650,7 @@ declare namespace ts {
         error?(s: string): void;
         useCaseSensitiveFileNames?(): boolean;
         readDirectory?(path: string, extensions?: ReadonlyArray<string>, exclude?: ReadonlyArray<string>, include?: ReadonlyArray<string>, depth?: number): string[];
-        readFile?(path: string, encoding?: string): string | undefined;
+        readFile?(path: string, encoding?: string): Promise<string | undefined>;
         realpath?(path: string): string;
         fileExists?(path: string): boolean;
         getTypeRootsVersion?(): number;
@@ -8146,7 +8146,7 @@ declare namespace ts.server {
         getDefaultLibFileName(): string;
         useCaseSensitiveFileNames(): boolean;
         readDirectory(path: string, extensions?: ReadonlyArray<string>, exclude?: ReadonlyArray<string>, include?: ReadonlyArray<string>, depth?: number): string[];
-        readFile(fileName: string): string | undefined;
+        readFile(fileName: string): Promise<string | undefined>;
         writeFile(fileName: string, content: string): void;
         fileExists(file: string): boolean;
         resolveModuleNames(moduleNames: string[], containingFile: string, reusedNames?: string[]): ResolvedModuleFull[];

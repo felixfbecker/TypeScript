@@ -5,7 +5,7 @@ namespace ts {
      */
     export interface DirectoryStructureHost {
         fileExists(path: string): boolean;
-        readFile(path: string, encoding?: string): string | undefined;
+        readFile(path: string, encoding?: string): Promise<string | undefined>;
 
         // TODO: GH#18217 Optional methods are frequently used as non-optional
         directoryExists?(path: string): boolean;

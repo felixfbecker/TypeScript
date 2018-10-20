@@ -196,7 +196,7 @@ namespace ts {
          * Without these methods, only completions for ambient modules will be provided.
          */
         readDirectory?(path: string, extensions?: ReadonlyArray<string>, exclude?: ReadonlyArray<string>, include?: ReadonlyArray<string>, depth?: number): string[];
-        readFile?(path: string, encoding?: string): string | undefined;
+        readFile?(path: string, encoding?: string): Promise<string | undefined>;
         realpath?(path: string): string;
         fileExists?(path: string): boolean;
 

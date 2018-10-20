@@ -71,7 +71,7 @@ namespace ts {
         else {
             return { readFile, realpath, fileExists: path => map.has(path) };
         }
-        function readFile(path: string): string | undefined {
+        function readFile(path: string): Promise<string | undefined> {
             const file = map.get(path);
             return file && file.content;
         }

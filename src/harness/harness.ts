@@ -475,7 +475,7 @@ namespace Harness {
         useCaseSensitiveFileNames(): boolean;
         resolvePath(path: string): string | undefined;
         getFileSize(path: string): number;
-        readFile(path: string): string | undefined;
+        readFile(path: string): Promise<string | undefined>;
         writeFile(path: string, contents: string): void;
         directoryName(path: string): string | undefined;
         getDirectories(path: string): string[];
@@ -858,7 +858,7 @@ namespace Harness {
             return HttpResponseMessage.hasSuccessStatusCode(response) ? +response.headers.get("Content-Length")!.toString() : 0;
         }
 
-        function readFile(path: string): string | undefined {
+        function readFile(path: string): Promise<string | undefined> {
             const response = send(HttpRequestMessage.get(new URL(path, serverRoot)));
             return HttpResponseMessage.hasSuccessStatusCode(response) && response.content ? response.content.content : undefined;
         }
